@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('name');
             $table->integer('hours');
             $table->string('date');
+            $table->string('time');
             $table->string('place');
             $table->string('goals')->nullable();
             $table->timestamps();

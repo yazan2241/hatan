@@ -1,20 +1,11 @@
 <?php
 
-use App\Http\Controllers\BankController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\DonorController;
-use App\Models\Bank;
-use App\Models\Donor;
 use App\Models\User;
 use App\Models\Event;
 use App\Models\RegisterEvent;
-use GrahamCampbell\ResultType\Success;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Response;
-use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Hash;
 
 /*
 |--------------------------------------------------------------------------
@@ -33,8 +24,6 @@ Route::middleware('auth:api')->get('/user', function (Request $request) {
 
 Route::post('/login' , function(Request $request){
 
-    $input = $request->all();
-    
     $email =  $request->input('email');
     $password = $request->input('password');
     $user =  User::where('email', '=', $email)->first();
@@ -138,6 +127,35 @@ Route::post('/profile' , function(Request $request){
 });
 
 
+
+
+
+
+
+
+
+
+
+
+/*
+    Events Api
+*/
+
+Route::post('/addEvent' , function(Request $request){
+    $event = new Event($request->all());
+    if($event->save()){
+        return Response::json(
+            ['success' => 'Event added']
+        , 200);
+    }
+    else{
+        return Response::json(
+            ['error' => 'Could not add event']
+        , 404);
+    }
+});
+
+
 Route::post('/eventProfile' , function(Request $request){
     $event =  Event::where('id', '=', $request->input('eventId'))->first();
     if($event){
@@ -147,38 +165,6 @@ Route::post('/eventProfile' , function(Request $request){
     } else {
         return Response::json(['error' => 'Event not found'], 404);
     }
-});
-
-Route::post('/joinEvent' , function(Request $request){
-    $user =  User::where('id', '=', $request->input('id'))->first();
-    if($user){
-        $event =  Event::where('id', '=', $request->input('eventId'))->first();
-        if($event){
-            $isRegistered = RegisterEvent::where('userId' , '=' , $request->input('id'))->where('eventId' , '=' , $request->input('eventId'))->first();
-            if($isRegistered){
-                return Response::json(['error' => 'Already registered'], 201);
-            }
-            else{
-                $registeredUser = new RegisterEvent();
-                $registeredUser->userId = $request->input('id');
-                $registeredUser->eventId = $request->input('eventId');
-                
-                $user->hours = $user->hours + $event->hours;
-                $user->update();
-                $registeredUser->save();
-
-                return Response::json(
-                    ['success' => 'Event Registerd']
-                , 200);
-                }
-        } else {
-            return Response::json(['error' => 'Event not found'], 404);
-        }
-    }
-    else{
-        return Response::json(['error' => 'User not found'], 404);
-    }
-    
 });
 
 
@@ -201,6 +187,8 @@ Route::post('/getRegisteredEvents' , function(Request $request){
     
     foreach($events as $event){
         $regEvent = Event::where('id' , '=' , $event->eventId)->first();
+        $regEvent->certificateName = $event->certificateName;
+        $regEvent->certificateImage = $event->certificateImage;
         $registeredEvents[$j] = $regEvent;
         $j = $j + 1;
     }
@@ -210,6 +198,49 @@ Route::post('/getRegisteredEvents' , function(Request $request){
     , 200);
     
 });
+
+
+
+Route::post('/joinEvent' , function(Request $request){
+    set_time_limit(6000);
+    $user =  User::where('id', '=', $request->input('id'))->first();
+    if($user){
+        $event =  Event::where('id', '=', $request->input('eventId'))->first();
+        if($event){
+            $isRegistered = RegisterEvent::where('userId' , '=' , $request->input('id'))->where('eventId' , '=' , $request->input('eventId'))->first();
+            if($isRegistered){
+                return Response::json(['error' => 'Already registered'], 201);
+            }
+            else{
+                $registeredUser = new RegisterEvent();
+                $registeredUser->userId = $request->input('id');
+                $registeredUser->eventId = $request->input('eventId');
+                
+                $eveName = "شهادة حضور ";
+                $eveName = $eveName . $event->name;
+                $registeredUser->certificateName = $eveName;
+                $registeredUser->certificateImage = generateCertificate($user->firstName . " " . $user->fatherName . " " .$user->lastName , $registeredUser->eventId , $user->idNumber , $event->name , $event->hours , $event->place , $event->date);
+                
+                
+                $user->hours = $user->hours + $event->hours;
+                $user->update();
+                $registeredUser->save();
+
+                return Response::json(
+                    ['success' => 'Event Registerd']
+                , 200);
+                }
+        } else {
+            return Response::json(['error' => 'Event not found'], 404);
+        }
+    }
+    else{
+        return Response::json(['error' => 'User not found'], 404);
+    }
+    
+});
+
+
 
 Route::post('/cancelRegisteredEvent' , function(Request $request){
     
@@ -229,351 +260,153 @@ Route::post('/cancelRegisteredEvent' , function(Request $request){
 });
 
 
+// Update 1.1
 
 
+// Admin Api
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Route::post('/blogin' , function(Request $request){
-
-    $input = $request->all();
-    
-    $phone =  $request->input('phone');
-    $token = $request->input('token');
-    $user =  Donor::where('phone', '=', $phone)->first();
-    if($user){
-            $user->token = $request->has('token') ? $request->get('token') : $user->token;
-            $user->update();
-            return Response::json(
-                $user
-            , 200);
-        } else {
-            return Response::json([], 404);
-        }
-});
-
-
-
-Route::post('/register1' , function (Request $request){
-    /*
-    $validator = Validator::make($request->all(), [
-        'fullName' => 'required',
-        'phone' => 'required|unique:donors,phone',
-        'address' => 'required',
-        'age' => 'required|numeric',
-        'gender' => 'required|string',
-        'weight' => 'required',
-        'height' => 'required',
-        'medicalHistory' => 'required',
-        'bloodType' => 'required',
-        'token' => 'required'
-    ]);
-
-    if ($validator->fails()) {
-        return Response::json([
-            'message' => 'Error Input Data',
-            'data' => $validator->getMessageBag()
-        ], 400);
-    }
-    */
-    $donor = new Donor();
-    $donor->fullName = $request->input('fullName');
-    $donor->phone = $request->input('phone');
-    $donor->address = $request->input('address');
-    $donor->age = $request->input('age');
-    $donor->gender = $request->input('gender');
-    $donor->bloodType = $request->input('bloodType');
-    $donor->weight = $request->input('weight');
-    $donor->height = $request->input('height');
-    $donor->medicalHistory = $request->input('medicalHistory');
-    $donor->medicalHistory = $request->input('medicalHistory');
-    $donor->token = $request->token;
-    $donor->save();
-
-    return Response::json(
-        $donor
-    , 200);
-
-});
-
-
-Route::post('/check' , function (Request $request){
-    /*
-    $validator = Validator::make($request->all(), [
-        'fullName' => 'required',
-        'phone' => 'required|unique:donors,phone',
-        'address' => 'required',
-        'age' => 'required|numeric',
-        'gender' => 'required|string',
-        'weight' => 'required',
-        'height' => 'required',
-        'medicalHistory' => 'required',
-        'bloodType' => 'required',
-        'token' => 'required'
-    ]);
-
-    if ($validator->fails()) {
-        return Response::json([
-            'message' => 'Error Input Data',
-            'data' => $validator->getMessageBag()
-        ], 400);
-    }
-    */
-    $phone =  $request->input('phone');
-
-    $user =  Donor::where('phone', '=', $phone)->first();
-    if($user){
-            return Response::json(
-                'User exist'
-            , 301);
-        } else {
-            return Response::json('User not exist', 200);
-        }
-
-});
-
-Route::post('/donor-profile' , function(Request $request){
-    /*
-    $validator = Validator::make($request->all() , [
-        'phone' => 'required'
-    ]);
-
-    if ($validator->fails()) {
-        return Response::json([
-            'message' => 'Error Input Data',
-            'data' => $validator->getMessageBag()
-        ], 400);
-    }
-    */
-    $data = Donor::where('phone' , $request->phone)->first();
-    
-    return Response::json(
-        $data
-    , 200);
-});
-
-Route::post('/donor-update' , function(Request $request){
-/*
-    $validator = Validator::make($request->all() , [
-        'phone' => 'required'
-    ]);
-
-    if ($validator->fails()) {
-        return Response::json([
-            'message' => 'Error Input Data',
-            'data' => $validator->getMessageBag()
-        ], 400);
-    }
-*/
-    $data = Donor::where('phone' , $request->phone)->first();
-    
-    $data->fullName = $request->has('fullName') ? $request->get('fullName') : $data->fullName;
-    $data->phone = $request->has('phone') ? $request->get('phone') : $data->phone;
-    $data->address = $request->has('address') ? $request->get('address') : $data->address;
-    $data->age = $request->has('age') ? $request->get('age') : $data->age;
-    $data->gender = $request->has('gender') ? $request->get('gender') : $data->gender;
-    $data->weight = $request->has('weight') ? $request->get('weight') : $data->weight;
-    $data->height = $request->has('height') ? $request->get('height') : $data->height;
-    $data->medicalHistory = $request->has('medicalHistory') ? $request->get('medicalHistory') : $data->medicalHistory;
-    $data->bloodType = $request->has('bloodType') ? $request->get('bloodType') : $data->bloodType;
-    $data->token = $request->has('token') ? $request->get('token') : $data->token;
-    
-    $data->update();
-
-    return Response::json(
-        $data
-    , 200);
-});
-
-Route::get('/bloodBank' , function(){
-    return view('bloodBank');
-});
-
-Route::post('/bloodBank-details' , [BankController::class , 'show']);
-
-//Route::get('/allBloodBanks' , [BankController::class , 'index']);
-
-Route::post('/allBanks' , [BankController::class , 'index1']);
-
-
-
-// Dashboard
-
-Route::get('/donors' , [DonorController::class , 'index']);
-
-Route::post('/bloodBank' , [BankController::class , 'store']);
-
-
-Route::post('/donor-delete', function (Request $request) {
-/*
-    $validator = Validator::make($request->all(), [
-        'id' => 'required'
-    ]);
-
-    if ($validator->fails()) {
-        return Response::json([
-            'message' => 'Error Input Data',
-            'data' => $validator->getMessageBag()
-        ], 400);
-    }
-*/
-    $phone =  $request->input('phone');
-    $data = Donor::where('phone', $phone)->delete();
-
-    return Response::json(
-        $data
-    , 200);
-
-});
-
-Route::post('/bank-delete', function (Request $request) {
-    /*
-        $validator = Validator::make($request->all(), [
-            'id' => 'required'
-        ]);
-    
-        if ($validator->fails()) {
-            return Response::json([
-                'message' => 'Error Input Data',
-                'data' => $validator->getMessageBag()
-            ], 400);
-        }
-    */
-        $phone =  $request->input('phone');
-        $data = Bank::where('phone_number', $phone)->delete();
-    
+Route::post('/getTeamMembers' , function(Request $request){
+    $team = User::where('team' , '=' , $request->input('teamId'))->get();
+    if($team){
         return Response::json(
-            $data
+            $team
         , 200);
-    
-    });
-
-
-// Notification
-
-Route::post('send-notification', [App\Http\Controllers\NotificationController::class, 'send']);
-
-Route::get('/wapi' , [App\Http\Controllers\PhoneAuthController::class , 'sendMessage']);
-
-
-Route::post('/bank-update' , function(Request $request){
-        $data = Bank::where('phone_number' , $request->phone_number)->first();
-        
-        $data->name = $request->has('name') ? $request->get('name') : $data->name;
-        $data->phone_number = $request->has('phone_number') ? $request->get('phone_number') : $data->phone_number;
-        $data->address = $request->has('address') ? $request->get('address') : $data->address;
-        $data->address_latitude = $request->has('address_latitude') ? $request->get('address_latitude') : $data->address_latitude;
-        $data->address_longitude = $request->has('address_longitude') ? $request->get('address_longitude') : $data->address_longitude;
-        $data->facebook_link = $request->has('facebook_link') ? $request->get('facebook_link') : $data->facebook_link;
-        $data->instagrame_link = $request->has('instagrame_link') ? $request->get('instagrame_link') : $data->instagrame_link;
-        
-        $data->update();
-    
+    }
+    else{
         return Response::json(
-            $data
-        , 200);
-    });
-
-Route::post('/reserve' , function(Request $request){
-    $phone =  $request->input('phone');
-    $date = $request->input('date');
-    $bank_phone = $request->input('bank_phone');
-
-    $d = new DateTime($date);
-    $currentDate = new DateTime();
-    $d = $d->format('Y-m-d H');
-    $currentDate = $currentDate->format('Y-m-d H');
-    $err = [];
-    $err['error'] = "Date reserved , pick another date";
-    
-    $query = DB::select("select * from reservation where bank_phone = ? and date = ?" , [$bank_phone , $d]);
-    if($query || $d < $currentDate){
-        return Response::json(
-            $err
+            ['error' => 'Team not found']
         , 404);
-    } else {
-        $query = DB::insert("insert into reservation(bank_phone , donor_phone , date) values (? , ? , ?)" , [$bank_phone , $phone , $d]);
-        if($query){
-            return Response::json(
-                $query
-            , 200);
-        } else {
-            return Response::json([], 404);
-        }
     }
+});
+
+Route::post('/getSectionMembers' , function(Request $request){
+    $section = User::where('section' , '=' , $request->input('sectionId'))->get();
+    if($section){
+        return Response::json(
+            $section
+        , 200);
+    }
+    else{
+        return Response::json(
+            ['error' => 'Section not found']
+        , 404);
+    }
+});
+
+
+
+
+// Route::post('/test' , function(){
+//     set_time_limit(6000);
+//     return generateCertificate("محمد فارس الاحمد" , "2" ,"1234092" , "رعاية الأطفال الأيتام" , "4" , "دار السيد عبدالله عباس الشربتلي" , "12-12-2020");
+// });
+
+
+
+function generateCertificate($name , $eventId , $id , $event , $hours , $place , $date){
 
     
-});
 
-Route::post('/myreservation' , function(Request $request){
-    $phone =  $request->input('phone');
-    $query = DB::select("select * from reservation where donor_phone = ?" , [$phone]);
-    foreach($query as $q){
-        $q->date = $q->date.":0:0";
-        
-        $d = new DateTime($q->date);
-        $currentDate = new DateTime();
+    require(public_path("arabic/Arabic.php"));
+    $Arabic = new I18N_Arabic('Glyphs'); 
 
-        $d = $d->format('Y-m-d H');
-        $currentDate = $currentDate->format('Y-m-d H');
+    $url = public_path("images/template.jpg");
+    $img = imagecreatefromjpeg($url);
 
-        if($q < $currentDate){
-            unset($q);
+    $txt = "تشهد إدارة فريق هتان الثالث عشر التطوعي التابع";
+    $img = writeText($txt , 350 , 200, $Arabic , $img , 0);
+
+    $txt = " لجمعية البر بمحافظة جدة";
+    $img = writeText($txt , 175 , 200 , $Arabic , $img , 0);
+
+    $txt = " المتطوع / ";
+    $img = writeText($txt , 450 , 240 , $Arabic , $img , 0);
+
+    $txt = $name;
+    $img = writeText($txt , 240 , 240 , $Arabic , $img , 1);
+
+    $txt = " رقم الهوية / ";
+    $img = writeText($txt , 420 , 280 , $Arabic , $img , 0);
+
+    $txt = $id;
+    $img = writeText($txt , 120 , 280 , $Arabic , $img , 1);
+
+    $txt = " شارك وحضر فعالية ";
+    $img = writeText($txt , 500 , 320 , $Arabic , $img , 0);
+
+    $txt = " " . $event . " ";
+    $img = writeText($txt , 340 , 320 , $Arabic , $img , 1);
+
+    $txt = "بواقع عدد(" . $hours . ") ساعات تطوعية في  ";
+    $img = writeText($txt , 410 , 360 , $Arabic , $img , 0);
+
+    $txt = " " . $place . " ";
+    $img = writeText($txt , 190 , 360 , $Arabic , $img , 1);
+
+    $date = convert_date($date);
+    $txt = " تاريخ " . $date;
+    $img = writeText($txt , 320 , 400 , $Arabic , $img , 0);
+
+    
+    
+    $quality = 100;
+    
+    imagejpeg($img, public_path("images/".$id."_".$eventId."_result.jpg"), $quality);
+
+    return "images/".$id."_".$eventId."_result.jpg";
+}
+
+function convert_date($date){
+    $dateList = explode("-" , $date);
+    $res = $dateList[0] . " ";
+    if($dateList[1] == 1) $res = $res . "كانون الثاني";
+    if($dateList[1] == 2) $res = $res . "شباط";
+    if($dateList[1] == 3) $res = $res . "اذار";
+    if($dateList[1] == 4) $res = $res . "نيسان";
+    if($dateList[1] == 5) $res = $res . "ايار";
+    if($dateList[1] == 6) $res = $res . "حزيران";
+    if($dateList[1] == 7) $res = $res . "تموز";
+    if($dateList[1] == 8) $res = $res . "اب";
+    if($dateList[1] == 9) $res = $res . "ايلول";
+    if($dateList[1] == 10) $res = $res . "تشرين الاول";
+    if($dateList[1] == 11) $res = $res . "تشرين الثاني";
+    if($dateList[1] == 12) $res = $res . "كانون الاول";
+    $res = $res . " ";
+    $res = $res . $dateList[2];
+
+    return $res;
+
+}
+
+
+function writeText($txt , $posX , $posY , $Arabic , $img , $type){
+    // char 48
+    // add 24
+    // line 72
+
+    $text = $Arabic->utf8Glyphs($txt);
+
+    if($type == 0){
+        for($i=0;$i<60-strlen($text);$i++){
+            $text = $text . "      ";
         }
-        $qu = DB::select("select * from banks where phone_number = ? limit 1" , [$q->bank_phone]);
-        foreach($qu as $qu){
-            $q->name = $qu->name;
-            $q->image = $qu->image;
-            $q->phone_number = $qu->phone_number;
-            $q->address = $qu->address;
+    }
+    else{
+        for($i=0;$i<60-strlen($text);$i++){
+            $text = "      " . $text;
         }
     }
     
-    if($query){
-        return Response::json(
-            $query
-        , 200);
-    } else {
-        return Response::json([], 404);
-    }
-});
+    $fontColor = imagecolorallocate($img , 30,30,30);
 
-Route::post('/checkavailable' , function(Request $request){
-    $date = $request->input('date');
-    $bank_phone = $request->input('bank_phone');
-    $query = DB::select("select * from reservation where bank_phone = ? and date = ?" , [$bank_phone , $date]);
-    if($query){
-        return Response::json(
-            "True"
-        , 200);
-    } else {
-        return Response::json("False", 200);
-    }
-});
+    
+    $angle = 0;
+    $fontSize = 14;
+
+    $font_file = public_path("fonts/NotoNaskhArabic-VariableFont_wght.ttf");
+
+    imagettftext($img , $fontSize , $angle , $posX , $posY , $fontColor ,$font_file, $text);
+    return $img;
+
+}

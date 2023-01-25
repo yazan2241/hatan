@@ -14,6 +14,7 @@ class event extends Model
         'name',
         'hours',
         'date',
+        'time',
         'place',
         'goals',
     ];

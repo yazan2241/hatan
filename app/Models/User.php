@@ -24,6 +24,7 @@ class User extends Authenticatable
         'section',
         'hours',
         'team',
+        'type',
     ];
 
     /**

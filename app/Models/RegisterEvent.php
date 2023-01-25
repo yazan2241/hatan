@@ -11,6 +11,8 @@ class RegisterEvent extends Model
     protected $fillable = [
         'id',
         'userId',
-        'eventId'
+        'eventId',
+        'certificateName',
+        'certificateImage'
     ];
 }

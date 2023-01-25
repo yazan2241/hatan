@@ -17,6 +17,8 @@ return new class extends Migration
             $table->id();
             $table->integer('userId');
             $table->integer('eventId');
+            $table->string('certificateName');
+            $table->string('certificateImage');
             $table->timestamps();
         });
     }
